@@ -33,15 +33,15 @@ def preprocess_data(train_path, test_path, output_train_path, output_test_path):
     columns_to_scale = ['Income', 'Income_Per_Minute', 'Income_Capped']  # Add any other relevant continuous features
     other_columns = [col for col in train_df.columns if col not in columns_to_scale + ['Comment', 'Processed_Comment', 'Label']]
     
-    print("Scaling relevant features...")
-    # Scale only the relevant features
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(train_df[columns_to_scale])
-    X_test_scaled = scaler.transform(test_df[columns_to_scale])
+    # print("Scaling relevant features...")
+    # # Scale only the relevant features
+    # scaler = StandardScaler()
+    # X_train_scaled = scaler.fit_transform(train_df[columns_to_scale])
+    # X_test_scaled = scaler.transform(test_df[columns_to_scale])
 
     # Combine scaled features with non-scaled features and vectorized comments
-    X_train = np.hstack([train_df[other_columns].values, X_train_scaled, X_train_counts])
-    X_test = np.hstack([test_df[other_columns].values, X_test_scaled, X_test_counts])
+    X_train = np.hstack([train_df[other_columns].values, X_train_counts])
+    X_test = np.hstack([test_df[other_columns].values, X_test_counts])
     
     y_train = train_df['Label'].values
     y_test = test_df['Label'].values
@@ -52,7 +52,7 @@ def preprocess_data(train_path, test_path, output_train_path, output_test_path):
     np.save(output_train_path + "_y.npy", y_train)
     np.save(output_test_path + "_X.npy", X_test)
     np.save(output_test_path + "_y.npy", y_test)
-    joblib.dump(scaler, output_train_path + "_scaler.pkl")
+    # joblib.dump(scaler, output_train_path + "_scaler.pkl")
     joblib.dump(vectorizer, output_train_path + "_vectorizer.pkl")
     
     print(f"Data preprocessing completed and saved to {output_train_path} and {output_test_path}.")
