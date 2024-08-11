@@ -1,69 +1,62 @@
 import pandas as pd
 import numpy as np
-import gensim
-import requests
-import os
-from gensim.models import KeyedVectors
+from hazm import Normalizer, word_tokenize
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+import joblib
 
-def download_and_load_word2vec_model(url, model_path):
-    if not os.path.exists(model_path):
-        print("Downloading Persian Word2Vec model...")
-        response = requests.get(url)
-        with open(model_path, 'wb') as f:
-            f.write(response.content)
-        print("Download complete.")
+def preprocess_persian_comment(comment):
+    """Normalize and tokenize Persian text."""
+    normalizer = Normalizer()
+    normalized_text = normalizer.normalize(comment)  # Normalize the text
+    tokens = word_tokenize(normalized_text)  # Tokenize the text into words
+    return ' '.join(tokens)  # Join tokens back into a string
+
+def preprocess_data(train_path, test_path, output_train_path, output_test_path):
+    # Load datasets
+    train_df = pd.read_csv(train_path)
+    test_df = pd.read_csv(test_path)
+
+    # Preprocess the 'Comment' column using hazm
+    train_df['Processed_Comment'] = train_df['Comment'].apply(preprocess_persian_comment)
+    test_df['Processed_Comment'] = test_df['Comment'].apply(preprocess_persian_comment)
+
+    # Use TF-IDF to vectorize the processed comments
+    vectorizer = TfidfVectorizer(max_features=5000)  # Adjust max_features as needed
+    X_train_tfidf = vectorizer.fit_transform(train_df['Processed_Comment']).toarray()
+    X_test_tfidf = vectorizer.transform(test_df['Processed_Comment']).toarray()
+
+    # Combine the TF-IDF features with the original features (excluding 'Comment' and 'Processed_Comment')
+    X_train = np.hstack([train_df.drop(columns=['Comment', 'Processed_Comment', 'Label']).values, X_train_tfidf])
+    X_test = np.hstack([test_df.drop(columns=['Comment', 'Processed_Comment', 'Label']).values, X_test_tfidf])
     
-    print("Loading model...")
-    word2vec_model = KeyedVectors.load_word2vec_format(model_path, binary=False, unicode_errors='ignore')
-    print("Model loaded successfully.")
-    return word2vec_model
-
-def encode_comment(comment, model):
-    tokens = comment.split()  # Simple tokenization; Persian might need a more sophisticated approach
-    vectors = [model[token] for token in tokens if token in model]
-    if len(vectors) == 0:
-        return np.zeros(model.vector_size)  # Return a zero vector if no tokens are found
-    return np.mean(vectors, axis=0)  # Average the vectors
-
-def add_comment_embeddings(df, model):
-    df['Comment_Embedding'] = df['Comment'].apply(lambda x: encode_comment(str(x), model))
-    return df
-
-def preprocess_data(config):
-    train_df = pd.read_csv(config['data']['train_path'])
-    test_df = pd.read_csv(config['data']['test_path'])
-
-    # Download and load the Word2Vec model
-    word2vec_url = "https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.fa.300.vec.gz"
-    word2vec_path = "cc.fa.300.vec.gz"
-    word2vec_model = download_and_load_word2vec_model(word2vec_url, word2vec_path)
-
-    # Add comment embeddings to the datasets
-    train_df = add_comment_embeddings(train_df, word2vec_model)
-    test_df = add_comment_embeddings(test_df, word2vec_model)
-
-    # Convert the embeddings to a format suitable for modeling
-    comment_embeddings_train = np.vstack(train_df['Comment_Embedding'].values)
-    comment_embeddings_test = np.vstack(test_df['Comment_Embedding'].values)
-
-    # Merge the embeddings back into the original DataFrame
-    train_df = pd.concat([train_df.drop(columns=['Comment_Embedding']), pd.DataFrame(comment_embeddings_train)], axis=1)
-    test_df = pd.concat([test_df.drop(columns=['Comment_Embedding']), pd.DataFrame(comment_embeddings_test)], axis=1)
+    y_train = train_df['Label'].values
+    y_test = test_df['Label'].values
 
     # Encode categorical features
     categorical_cols = train_df.select_dtypes(include=['object']).columns
     for col in categorical_cols:
         le = LabelEncoder()
-        train_df[col] = le.fit_transform(train_df[col])
+        combined_values = pd.concat([train_df[col], test_df[col]]).unique()
+        le.fit(combined_values)
+        train_df[col] = le.transform(train_df[col])
         test_df[col] = le.transform(test_df[col])
 
     # Normalize features
     scaler = StandardScaler()
-    X_train = scaler.fit_transform(train_df.drop(columns=['Label']))
-    X_test = scaler.transform(test_df.drop(columns=['Label']))
-    
-    y_train = train_df['Label']
-    y_test = test_df['Label']
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
 
-    return X_train, X_test, y_train, y_test
+    # Save the processed data
+    np.save(output_train_path + "_X.npy", X_train)
+    np.save(output_train_path + "_y.npy", y_train)
+    np.save(output_test_path + "_X.npy", X_test)
+    np.save(output_test_path + "_y.npy", y_test)
+    joblib.dump(scaler, output_train_path + "_scaler.pkl")
+    joblib.dump(vectorizer, output_train_path + "_vectorizer.pkl")
+    
+    print(f"Data preprocessing completed and saved to {output_train_path} and {output_test_path}.")
+
+if __name__ == "__main__":
+    preprocess_data('data/task_train_processed.csv', 'data/task_test_processed.csv',
+                    'data/processed_train', 'data/processed_test')

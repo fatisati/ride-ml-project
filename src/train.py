@@ -13,6 +13,7 @@ from src.models import create_logistic_regression_model, create_random_forest_mo
 import torch
 import torch.optim as optim
 import yaml
+import time
 
 
 def load_config(config_path='config.yaml'):
@@ -21,16 +22,25 @@ def load_config(config_path='config.yaml'):
     return config
 
 def train_logistic_regression(X_train, y_train, config):
+    print("Training Logistic Regression...")
+    start_time = time.time()
     model = create_logistic_regression_model(config['model']['logistic_regression']['class_weight'])
     model.fit(X_train, y_train)
+    end_time = time.time()
+    print(f"Logistic Regression training completed in {end_time - start_time:.2f} seconds.")
     return model
 
 def train_random_forest(X_train, y_train, config):
+    print("Training Random Forest...")
+    start_time = time.time()
     model = create_random_forest_model(config['model']['random_forest']['class_weight'])
     model.fit(X_train, y_train)
+    end_time = time.time()
+    print(f"Random Forest training completed in {end_time - start_time:.2f} seconds.")
     return model
 
 def train_deep_nn(X_train, y_train, config):
+    print("Training Deep Neural Network...")
     input_dim = X_train.shape[1]
     num_classes = 1
     model = create_deep_nn_model(input_dim, num_classes, config['model']['deep_nn']['dropout'])
@@ -52,9 +62,10 @@ def train_deep_nn(X_train, y_train, config):
         loss.backward()
         optimizer.step()
         
-        if (epoch+1) % 5 == 0:
+        if (epoch+1) % 5 == 0 or epoch == num_epochs - 1:
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
     
+    print("Deep Neural Network training completed.")
     return model
 
 if __name__ == "__main__":
