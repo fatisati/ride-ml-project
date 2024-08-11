@@ -57,7 +57,7 @@ def train_deep_nn(X_train, y_train, input_dim, num_epochs=20):
         if (epoch+1) % 5 == 0:
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
     
-    return model
+    return model, device
 
 if __name__ == "__main__":
     # Load preprocessed data
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     rf_model = train_random_forest(X_train, y_train)
     
     input_dim = X_train.shape[1]  # Number of input features
-    deep_nn_model = train_deep_nn(X_train, y_train, input_dim)
+    deep_nn_model, device = train_deep_nn(X_train, y_train, input_dim)
     
     # Save models
     torch.save(deep_nn_model.state_dict(), 'deep_nn_model.pth')
