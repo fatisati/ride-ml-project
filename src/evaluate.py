@@ -4,6 +4,7 @@ from src.models import create_logistic_regression_model, create_random_forest_mo
 import torch
 import joblib
 import yaml
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 def load_config(config_path='config.yaml'):
     with open(config_path, 'r') as file:
