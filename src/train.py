@@ -1,59 +1,51 @@
 import sys
 import os
+import numpy as np
+import torch
+import torch.optim as optim
+import joblib
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from torch import nn
+from sklearn.metrics import classification_report
 
 # Add the parent directory of 'src' to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.models import create_logistic_regression_model, create_random_forest_model, create_deep_nn_model
 
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from src.models import create_logistic_regression_model, create_random_forest_model, create_deep_nn_model
-import torch
-import torch.optim as optim
-import yaml
-import time
+# Load the preprocessed data
+def load_preprocessed_data(train_path, test_path):
+    X_train = np.load(train_path + "_X.npy", allow_pickle=True)
+    y_train = np.load(train_path + "_y.npy", allow_pickle=True)
+    X_test = np.load(test_path + "_X.npy", allow_pickle=True)
+    y_test = np.load(test_path + "_y.npy", allow_pickle=True)
+    return X_train, y_train, X_test, y_test
 
-
-def load_config(config_path='config.yaml'):
-    with open(config_path, 'r') as file:
-        config = yaml.safe_load(file)
-    return config
-
-def train_logistic_regression(X_train, y_train, config):
+def train_logistic_regression(X_train, y_train):
     print("Training Logistic Regression...")
-    start_time = time.time()
-    model = create_logistic_regression_model(config['model']['logistic_regression']['class_weight'])
+    model = LogisticRegression(max_iter=1000)
     model.fit(X_train, y_train)
-    end_time = time.time()
-    print(f"Logistic Regression training completed in {end_time - start_time:.2f} seconds.")
     return model
 
-def train_random_forest(X_train, y_train, config):
+def train_random_forest(X_train, y_train):
     print("Training Random Forest...")
-    start_time = time.time()
-    model = create_random_forest_model(config['model']['random_forest']['class_weight'])
+    model = RandomForestClassifier(n_estimators=100)
     model.fit(X_train, y_train)
-    end_time = time.time()
-    print(f"Random Forest training completed in {end_time - start_time:.2f} seconds.")
     return model
 
-def train_deep_nn(X_train, y_train, config):
+def train_deep_nn(X_train, y_train, input_dim, num_epochs=20):
     print("Training Deep Neural Network...")
-    input_dim = X_train.shape[1]
-    num_classes = 1
-    model = create_deep_nn_model(input_dim, num_classes, config['model']['deep_nn']['dropout'])
+    model = create_deep_nn_model(input_dim=input_dim, num_classes=1, dropout=0.5)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     
     X_train_tensor = torch.tensor(X_train, dtype=torch.float32).to(device)
-    y_train_tensor = torch.tensor(y_train.values, dtype=torch.float32).to(device)
+    y_train_tensor = torch.tensor(y_train, dtype=torch.float32).to(device)
 
     criterion = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=config['model']['deep_nn']['learning_rate'])
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    num_epochs = config['model']['deep_nn']['epochs']
     for epoch in range(num_epochs):
         model.train()
         optimizer.zero_grad()
@@ -62,25 +54,40 @@ def train_deep_nn(X_train, y_train, config):
         loss.backward()
         optimizer.step()
         
-        if (epoch+1) % 5 == 0 or epoch == num_epochs - 1:
+        if (epoch+1) % 5 == 0:
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
     
-    print("Deep Neural Network training completed.")
     return model
 
 if __name__ == "__main__":
-    from src.data_preprocessing import preprocess_data
-
-    config = load_config()
-    X_train, X_test, y_train, y_test = preprocess_data(config)
+    # Load preprocessed data
+    X_train, y_train, X_test, y_test = load_preprocessed_data('data/processed_train', 'data/processed_test')
     
     # Train models
-    log_reg_model = train_logistic_regression(X_train, y_train, config)
-    rf_model = train_random_forest(X_train, y_train, config)
-    deep_nn_model = train_deep_nn(X_train, y_train, config)
+    log_reg_model = train_logistic_regression(X_train, y_train)
+    rf_model = train_random_forest(X_train, y_train)
+    
+    input_dim = X_train.shape[1]  # Number of input features
+    deep_nn_model = train_deep_nn(X_train, y_train, input_dim)
     
     # Save models
     torch.save(deep_nn_model.state_dict(), 'deep_nn_model.pth')
-    import joblib
     joblib.dump(log_reg_model, 'log_reg_model.pkl')
     joblib.dump(rf_model, 'rf_model.pkl')
+    
+    # Evaluate the models on the test set
+    print("Evaluating Logistic Regression...")
+    y_pred_log_reg = log_reg_model.predict(X_test)
+    print(classification_report(y_test, y_pred_log_reg))
+    
+    print("Evaluating Random Forest...")
+    y_pred_rf = rf_model.predict(X_test)
+    print(classification_report(y_test, y_pred_rf))
+    
+    print("Evaluating Deep Neural Network...")
+    X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
+    deep_nn_model.eval()
+    with torch.no_grad():
+        y_pred_nn = deep_nn_model(X_test_tensor).cpu().numpy()
+    y_pred_nn = (y_pred_nn > 0.5).astype(int)
+    print(classification_report(y_test, y_pred_nn))
