@@ -31,8 +31,8 @@ def add_comment_embeddings(df, model):
     return df
 
 def preprocess_data(config):
-    train_df = pd.read_csv(config['data']['train_path']).drop(columns=['Unnamed: 0', 'Unnamed: 0.1'])
-    test_df = pd.read_csv(config['data']['test_path']).drop(columns=['Unnamed: 0', 'Unnamed: 0.1'])
+    train_df = pd.read_csv(config['data']['train_path'])
+    test_df = pd.read_csv(config['data']['test_path'])
 
     # Download and load the Word2Vec model
     word2vec_url = "https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.fa.300.vec.gz"
