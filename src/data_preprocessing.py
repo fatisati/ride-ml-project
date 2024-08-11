@@ -29,21 +29,22 @@ def preprocess_data(train_path, test_path, output_train_path, output_test_path):
     X_train_counts = vectorizer.fit_transform(train_df['Processed_Comment']).toarray()
     X_test_counts = vectorizer.transform(test_df['Processed_Comment']).toarray()
 
-    print("Combining CountVectorizer features with original dataset features...")
-    # Exclude non-numeric columns and combine the CountVectorizer features with numeric ones
-    non_numeric_cols = ['Comment', 'Processed_Comment', 'Label']
-    numeric_cols = train_df.drop(columns=non_numeric_cols).select_dtypes(include=[np.number]).columns
-    X_train = np.hstack([train_df[numeric_cols].values, X_train_counts])
-    X_test = np.hstack([test_df[numeric_cols].values, X_test_counts])
+    # Identify relevant columns for scaling
+    columns_to_scale = ['Income', 'Income_Per_Minute', 'Income_Capped']  # Add any other relevant continuous features
+    other_columns = [col for col in train_df.columns if col not in columns_to_scale + ['Comment', 'Processed_Comment', 'Label']]
+    
+    print("Scaling relevant features...")
+    # Scale only the relevant features
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(train_df[columns_to_scale])
+    X_test_scaled = scaler.transform(test_df[columns_to_scale])
+
+    # Combine scaled features with non-scaled features and vectorized comments
+    X_train = np.hstack([train_df[other_columns].values, X_train_scaled, X_train_counts])
+    X_test = np.hstack([test_df[other_columns].values, X_test_scaled, X_test_counts])
     
     y_train = train_df['Label'].values
     y_test = test_df['Label'].values
-
-    print("Normalizing features...")
-    # Normalize only the numeric features
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
 
     print("Saving the processed data...")
     # Save the processed data
