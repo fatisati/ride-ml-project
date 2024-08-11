@@ -30,15 +30,17 @@ def preprocess_data(train_path, test_path, output_train_path, output_test_path):
     X_test_counts = vectorizer.transform(test_df['Processed_Comment']).toarray()
 
     print("Combining CountVectorizer features with original dataset features...")
-    # Combine the CountVectorizer features with the original features (excluding 'Comment' and 'Processed_Comment')
-    X_train = np.hstack([train_df.drop(columns=['Comment', 'Processed_Comment', 'Label']).values, X_train_counts])
-    X_test = np.hstack([test_df.drop(columns=['Comment', 'Processed_Comment', 'Label']).values, X_test_counts])
+    # Exclude non-numeric columns and combine the CountVectorizer features with numeric ones
+    non_numeric_cols = ['Comment', 'Processed_Comment', 'Label']
+    numeric_cols = train_df.drop(columns=non_numeric_cols).select_dtypes(include=[np.number]).columns
+    X_train = np.hstack([train_df[numeric_cols].values, X_train_counts])
+    X_test = np.hstack([test_df[numeric_cols].values, X_test_counts])
     
     y_train = train_df['Label'].values
     y_test = test_df['Label'].values
 
     print("Normalizing features...")
-    # Normalize features
+    # Normalize only the numeric features
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
