@@ -1,0 +1,13 @@
+data:
+  train_path: 'data/task_train_processed.csv'
+  test_path: 'data/task_test_processed.csv'
+
+model:
+  logistic_regression:
+    class_weight: 'balanced'
+  random_forest:
+    class_weight: 'balanced'
+  deep_nn:
+    epochs: 20
+    learning_rate: 0.001
+    dropout: 0.5
