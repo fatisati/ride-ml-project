@@ -11,10 +11,6 @@ def preprocess_data(config):
     train_df = pd.read_csv(config['data']['train_path'])
     test_df = pd.read_csv(config['data']['test_path'])
 
-    # Drop unnecessary columns
-    train_df = train_df.drop(columns=['Unnamed: 0', 'Unnamed: 0.1'])
-    test_df = test_df.drop(columns=['Unnamed: 0', 'Unnamed: 0.1'])
-
     # Separate features and target
     X_train = train_df.drop(columns=['Label'])
     y_train = train_df['Label']
