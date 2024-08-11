@@ -1,3 +1,11 @@
+import sys
+import os
+
+# Add the parent directory of 'src' to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.models import create_logistic_regression_model, create_random_forest_model, create_deep_nn_model
+
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -5,6 +13,7 @@ from src.models import create_logistic_regression_model, create_random_forest_mo
 import torch
 import torch.optim as optim
 import yaml
+
 
 def load_config(config_path='config.yaml'):
     with open(config_path, 'r') as file:
