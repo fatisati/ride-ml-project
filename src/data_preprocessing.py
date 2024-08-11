@@ -5,17 +5,25 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import joblib
 from tqdm import tqdm
+from joblib import Parallel, delayed
 
 # Initialize tqdm
 tqdm.pandas()
 
-# Function to preprocess Persian text using hazm
-def preprocess_persian_text(comment):
-    normalizer = Normalizer()
+# Initialize hazm components globally to avoid reinitializing them repeatedly
+normalizer = Normalizer()
+
+# Function to preprocess Persian text using hazm with simplifications
+def preprocess_persian_text_simple(comment):
     normalized_text = normalizer.normalize(comment)  # Normalize the text
-    tokens = word_tokenize(normalized_text)  # Tokenize the text into words
+    # Use a simpler and faster tokenization method
+    tokens = normalized_text.split()  # Split by spaces
     processed_comment = ' '.join(tokens)  # Join tokens back into a string
     return processed_comment
+
+# Function to apply preprocessing in parallel
+def preprocess_parallel(df, column, n_jobs=-1):
+    return Parallel(n_jobs=n_jobs)(delayed(preprocess_persian_text_simple)(comment) for comment in tqdm(df[column]))
 
 # Function to preprocess data
 def preprocess_data(train_path, test_path, output_train_path, output_test_path):
@@ -23,14 +31,14 @@ def preprocess_data(train_path, test_path, output_train_path, output_test_path):
     train_df = pd.read_csv(train_path)
     test_df = pd.read_csv(test_path)
 
-    print("Preprocessing the 'Comment' column...")
-    # Preprocess the 'Comment' column using hazm with progress indication
-    train_df['Processed_Comment'] = train_df['Comment'].progress_apply(preprocess_persian_text)
-    test_df['Processed_Comment'] = test_df['Comment'].progress_apply(preprocess_persian_text)
+    print("Preprocessing the 'Comment' column in parallel...")
+    # Preprocess the 'Comment' column using hazm with parallel processing
+    train_df['Processed_Comment'] = preprocess_parallel(train_df, 'Comment')
+    test_df['Processed_Comment'] = preprocess_parallel(test_df, 'Comment')
 
     print("Vectorizing the processed comments using TF-IDF...")
     # Use TF-IDF to vectorize the processed comments
-    vectorizer = TfidfVectorizer(max_features=5000)  # Adjust max_features as needed
+    vectorizer = TfidfVectorizer(max_features=1000)  # Reduce max_features for faster processing
     X_train_tfidf = vectorizer.fit_transform(train_df['Processed_Comment']).toarray()
     X_test_tfidf = vectorizer.transform(test_df['Processed_Comment']).toarray()
 
